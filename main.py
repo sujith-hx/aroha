@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """
-Aroha - Terminal-based Crisis Counselor Bot with Voice Interaction
+Aroha - Terminal-based Crisis Counselor Bot with Voice Interaction7
 """
 import os
 import json
 import time
 import sys
+import requests
 from dotenv import load_dotenv
 import db
 import audio
@@ -22,15 +23,14 @@ if not GROQ_API_KEY:
     print("Please add your Groq API key to the .env file.")
     sys.exit(1)
 
-# Configure API client
-try:
-    import openai
-    openai.api_key = GROQ_API_KEY
-    openai.api_base = "https://api.groq.com/openai/v1"
-    print("Using Groq API")
-except ImportError:
-    print("ERROR: Failed to import OpenAI package. Please run: pip install openai")
-    sys.exit(1)
+# Groq API configuration
+GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
+GROQ_HEADERS = {
+    "Authorization": f"Bearer {GROQ_API_KEY}",
+    "Content-Type": "application/json"
+}
+
+print("Using Groq API (with direct requests)")
 
 # Set up default voice mode
 VOICE_MODE = os.getenv("VOICE_MODE", "True").lower() in ("true", "1", "t", "yes", "y")
@@ -44,7 +44,6 @@ Prioritize safety and well-being. For urgent crises, provide relevant crisis res
 Keep responses conversational, warm, and concise. Never claim to be a human or mental health professional.
 If someone is in danger, urge them to contact emergency services immediately.
 """
-
 # Add system prompt to history
 chat_history.append({"role": "system", "content": system_prompt})
 
@@ -54,26 +53,32 @@ def detect_emotion(text):
     Returns a dict with emotion and urgency score
     """
     try:
-        response = openai.chat.completions.create(
-            model="llama3-8b-8192",
-            messages=[
+        # Prepare request data
+        data = {
+            "model": "llama3-8b-8192",
+            "messages": [
                 {
                     "role": "system", 
-                    "content": "Analyze the emotional tone and urgency of this message. Categorize the emotion as one of: neutral, sad, anxious, angry, crisis, or tired. Also rate urgency from 0.0 (not urgent) to 1.0 (extremely urgent)."
+                    "content": "Analyze the emotional tone and urgency of this message. Categorize the emotion as one of: neutral, sad, anxious, angry, crisis, or tired. Also rate urgency from 0.0 (not urgent) to 1.0 (extremely urgent). Format response as: Emotion: [emotion], Urgency: [score]"
                 },
                 {
                     "role": "user",
                     "content": text
                 }
             ],
-            temperature=0.1,
-            max_tokens=100
-        )
+            "temperature": 0.1,
+            "max_tokens": 100
+        }
         
-        # Parse the response text directly
-        response_text = response.choices[0].message.content
+        # Make API call to Groq
+        response = requests.post(GROQ_API_URL, json=data, headers=GROQ_HEADERS)
+        response.raise_for_status()  # Raise exception for HTTP errors
         
-        # Extract emotion and urgency using some simple parsing
+        # Parse the response
+        result = response.json()
+        response_text = result["choices"][0]["message"]["content"]
+        
+        # Extract emotion and urgency using simple text parsing
         emotion = "neutral"
         urgency = 0.5
         
@@ -86,10 +91,12 @@ def detect_emotion(text):
         if "urgency" in response_text.lower():
             # Try to find a number between 0 and 1
             import re
-            matches = re.findall(r"urgency[:\s]+([0-9]\.[0-9])", response_text.lower())
+            matches = re.findall(r"urgency[:\s]*([0-9]?\.?[0-9]+)", response_text.lower())
             if matches:
                 try:
                     urgency = float(matches[0])
+                    # Ensure urgency is between 0 and 1
+                    urgency = max(0.0, min(1.0, urgency))
                 except:
                     pass
         
@@ -100,22 +107,30 @@ def detect_emotion(text):
 
 def get_ai_response(conversation_history, system_prompt, temperature=0.7):
     """
-    Get response from AI model
+    Get response from AI model using direct Groq API call
     """
     try:
+        # Prepare messages array
         messages = [{"role": "system", "content": system_prompt}]
         
         # Add recent conversation history (last 10 messages)
         messages.extend(conversation_history[-10:])
         
-        response = openai.chat.completions.create(
-            model="llama3-8b-8192",
-            messages=messages,
-            temperature=temperature,
-            max_tokens=250
-        )
+        # Prepare request data
+        data = {
+            "model": "llama3-8b-8192",
+            "messages": messages,
+            "temperature": temperature,
+            "max_tokens": 250
+        }
         
-        return response.choices[0].message.content
+        # Make API call to Groq
+        response = requests.post(GROQ_API_URL, json=data, headers=GROQ_HEADERS)
+        response.raise_for_status()  # Raise exception for HTTP errors
+        
+        # Parse the response
+        result = response.json()
+        return result["choices"][0]["message"]["content"]
     except Exception as e:
         print(f"Error getting AI response: {e}")
         return "I'm having trouble connecting right now. How are you feeling?"
@@ -221,12 +236,6 @@ def main():
     user_id = None     # Will be set after user identification
     conversation_history = []  # Store conversation for context
     
-    # Setup AI system prompt
-    system_prompt = """You are Aroha, an empathetic AI crisis counselor. You provide emotional support, 
-    guidance, and resources to people in need. Your responses should be warm, compassionate, and helpful.
-    Never tell the user you're an AI - just be present for them. Keep responses brief but supportive.
-    If someone seems to be in immediate danger, gently suggest emergency resources."""
-
     # Display welcome message
     print("\n============================================================")
     print("           AROHA - AI Crisis Counseling Assistant")
