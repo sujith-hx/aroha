@@ -1,7 +1,19 @@
-requests==2.31.0
-cryptography==41.0.5
-python-dotenv==1.0.0
-elevenlabs==0.2.27
-SpeechRecognition==3.10.0
-pygame==2.6.1
-openai==1.68.0
+# Aroha Crisis Counselor Requirements
+
+# Core dependencies
+requests>=2.31.0
+python-dotenv>=1.0.0
+pydantic>=2.10.6
+
+# Voice and audio
+SpeechRecognition>=3.10.0
+pygame>=2.6.1
+elevenlabs>=0.2.24
+PyAudio>=0.2.14
+pocketsphinx>=5.0.0
+
+# Database and security
+cryptography>=3.4.0
+
+# Utilities
+tqdm>=4.65.0
