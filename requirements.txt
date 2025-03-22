@@ -1,0 +1,7 @@
+requests==2.31.0
+cryptography==41.0.5
+python-dotenv==1.0.0
+elevenlabs==0.2.27
+SpeechRecognition==3.10.0
+pygame==2.6.1
+openai==1.68.0
