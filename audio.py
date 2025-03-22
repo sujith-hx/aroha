@@ -18,15 +18,8 @@ pygame.mixer.init()
 # Load environment variables
 load_dotenv()
 
-# Get API keys
-ELEVENLABS_API_KEYS = [
-    os.getenv("ELEVENLABS_API_KEY_1"),
-    os.getenv("ELEVENLABS_API_KEY_2"),
-    os.getenv("ELEVENLABS_API_KEY_3", "")  # Optional backup keys
-]
-
-# Filter out empty keys
-ELEVENLABS_API_KEYS = [key for key in ELEVENLABS_API_KEYS if key]
+# Get API key
+ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY")
 
 # Default voice ID - using Rachel (female voice)
 DEFAULT_VOICE_ID = os.getenv("ELEVENLABS_VOICE_ID", "21m00Tcm4TlvDq8ikWAM")  # Rachel voice (female)
@@ -40,7 +33,6 @@ FEMALE_VOICE_IDS = [
 ]
 
 # Global variables
-current_key_index = 0
 recognizer = sr.Recognizer()
 ffmpeg_available = False  # Track if ffmpeg is available
 
@@ -62,33 +54,6 @@ def check_ffmpeg():
         print(f"Error checking for ffmpeg: {e}")
         print("Audio conversion capabilities will be limited")
         return False
-
-def set_eleven_api_key():
-    """Set the ElevenLabs API key from our list of keys"""
-    global current_key_index
-    
-    if not ELEVENLABS_API_KEYS:
-        raise ValueError("No ElevenLabs API keys found. Please add at least one key to .env file.")
-    
-    # Try to use the current key
-    try:
-        set_api_key(ELEVENLABS_API_KEYS[current_key_index])
-        return True
-    except Exception as e:
-        print(f"Error with ElevenLabs key {current_key_index + 1}: {e}")
-        
-        # Try other keys if available
-        for i in range(len(ELEVENLABS_API_KEYS)):
-            if i != current_key_index:
-                try:
-                    current_key_index = i
-                    set_api_key(ELEVENLABS_API_KEYS[i])
-                    return True
-                except:
-                    continue
-        
-        # If we get here, all keys failed
-        raise ValueError("All ElevenLabs API keys failed. Please check your API keys.")
 
 def _adjust_voice_settings(emotion, urgency):
     """
@@ -143,13 +108,13 @@ def play_audio(text, emotion="neutral", urgency=0.5, voice_id=None, username="us
     """
     Generate and play audio response based on text without saving files
     """
-    if not ELEVENLABS_API_KEYS:
-        print("No ElevenLabs API keys available. Skipping audio generation.")
+    if not ELEVENLABS_API_KEY:
+        print("No ElevenLabs API key available. Skipping audio generation.")
         return None
     
     try:
         # Set the API key
-        set_eleven_api_key()
+        set_api_key(ELEVENLABS_API_KEY)
         
         # Get the voice settings based on emotion
         stability, similarity_boost, speaking_rate = _adjust_voice_settings(emotion, urgency)
@@ -246,14 +211,14 @@ def initialize_audio():
     
     print("Initializing audio components...")
     
-    # Check for API keys
-    if not ELEVENLABS_API_KEYS:
-        print("Warning: No ElevenLabs API keys found. Voice output will be disabled.")
+    # Check for API key
+    if not ELEVENLABS_API_KEY:
+        print("Warning: No ElevenLabs API key found. Voice output will be disabled.")
         return False
         
     # Validate API key and voice ID
     try:
-        set_eleven_api_key()
+        set_api_key(ELEVENLABS_API_KEY)
         print(f"Text-to-speech initialized with voice {DEFAULT_VOICE_ID}")
     except Exception as e:
         print(f"Error initializing text-to-speech: {e}")
